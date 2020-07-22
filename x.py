@@ -36,9 +36,9 @@ def send(g, data, length):
         bit = data & 1
         g.set_value(ICSPDAT, bit)
         g.set_value(ICSPCLK, 1)
-        sleep(.005)
+        sleep(.001)
         g.set_value(ICSPCLK, 0)
-        sleep(.005)
+        sleep(.001)
 
         data >>= 1
 
@@ -56,12 +56,12 @@ def recv(g, length):
         data >>= 1
 
         g.set_value(ICSPCLK, 1)
-        sleep(.005)
+        sleep(.001)
 
         bit = g.get_value(ICSPDAT)
         data |= bit << (length - 1)
         g.set_value(ICSPCLK, 0)
-        sleep(.005)
+        sleep(.001)
 
     return data
 
@@ -86,25 +86,30 @@ def enter_lvp_mode(g):
 
 def load_configuration(g, data):
     send(g, 0x00, 6)
-    sleep(.05)
+    sleep(.001)
     send(g, data << 1, 16)
-    sleep(.05)
+    sleep(.001)
 
 
 def read_data_from_program_memory(g):
     send(g, 0x04, 6)
     g.set_direction(ICSPDAT, "in")
-    sleep(.05)
+    sleep(.001)
     data = recv(g, 16)
     g.set_direction(ICSPDAT, "out")
-    sleep(.05)
+    sleep(.001)
 
     return (data >> 1) & 0x3FFF
 
 
 def increment_address(g):
     send(g, 0x06, 6)
-    sleep(.05)
+    sleep(.001)
+
+
+def reset_address(g):
+    send(g, 0x16, 6)
+    sleep(.001)
 
 
 if __name__ == "__main__":
@@ -118,13 +123,27 @@ if __name__ == "__main__":
 
         enter_lvp_mode(g)
 
-        load_configuration(g, 0x00)
+        config = {}
+        for i in range(1000):
+            print(f"=== Iteration {i} ===")
 
-        for _ in range(12):
-            data = read_data_from_program_memory(g)
-            print(f"0x{data:X}")
+            load_configuration(g, 0x00)
 
-            increment_address(g)
+            for addr in range(0x8000, 0x8018):
+                data = read_data_from_program_memory(g)
+
+                if i == 0:
+                    print(f"[0x{addr:04X}]: 0x{data:04X}")
+                    config[addr] = data
+                elif config[addr] != data:
+                    logger.error(
+                        f"[0x{addr:04X}]: expected 0x{config[addr]:04X}, "
+                        f"got 0x{data:04X}"
+                    )
+
+                increment_address(g)
+
+            reset_address(g)
 
         g.set_direction(ICSPDAT, "in")
         g.set_direction(ICSPCLK, "in")
