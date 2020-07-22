@@ -26,7 +26,7 @@ def reverse_bits(data, length):
     return data2
 
 
-def send(data, length):
+def send(g, data, length):
     """Send `length` bits of `data` LSb first
 
     ICSPCLK must be low when this function is called.
@@ -43,7 +43,7 @@ def send(data, length):
         data >>= 1
 
 
-def recv(length):
+def recv(g, length):
     """Receive `length` bits LSb first
 
     ICSPCLK must be low and ICSPDAT must be configured as an input when this
@@ -66,54 +66,65 @@ def recv(length):
     return data
 
 
+def enter_lvp_mode(g):
+    # Hold in reset.
+
+    g.set_value(MCLR_N, 0)
+    sleep(.05)
+
+    # Send LVP key sequence.
+
+    g.set_value(ICSPCLK, 0)
+    g.set_direction(ICSPDAT, "out")
+    sleep(.05)
+
+    key_sequence = 0x4D434850  # "MCHP"
+    send(g, key_sequence, 32)
+    send(g, 0, 1)
+    sleep(.05)
+
+
+def load_configuration(g, data):
+    send(g, 0x00, 6)
+    sleep(.05)
+    send(g, data << 1, 16)
+    sleep(.05)
+
+
+def read_data_from_program_memory(g):
+    send(g, 0x04, 6)
+    g.set_direction(ICSPDAT, "in")
+    sleep(.05)
+    data = recv(g, 16)
+    g.set_direction(ICSPDAT, "out")
+    sleep(.05)
+
+    return (data >> 1) & 0x3FFF
+
+
+def increment_address(g):
+    send(g, 0x06, 6)
+    sleep(.05)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     g = pigo.GpioManager()
     with g:
-        # Exit programming mode.
-
+        # Exit programming mode, if active.
         g.set_value(MCLR_N, 1)
-        sleep(.05)
+        sleep(.5)
 
-        # Hold in reset.
+        enter_lvp_mode(g)
 
-        g.set_value(MCLR_N, 0)
-        sleep(.05)
-
-        # Enter programming mode.
-
-        g.set_value(ICSPCLK, 0)
-        g.set_direction(ICSPDAT, "out")
-        sleep(.05)
-
-        key_sequence = 0x4D434850  # "MCHP"
-        send(key_sequence, 32)
-        send(0, 1)
-        sleep(.05)
-
-        # Send "Load Configuration" command.
-
-        send(0x00, 6)
-        sleep(.05)
-        send(0xFF, 16)
-        sleep(.05)
+        load_configuration(g, 0x00)
 
         for _ in range(12):
-            # Send "Read Data From Program Memory" command.
-
-            send(0x04, 6)
-            g.set_direction(ICSPDAT, "in")
-            sleep(.05)
-            data = recv(16)
+            data = read_data_from_program_memory(g)
             print(f"0x{data:X}")
-            g.set_direction(ICSPDAT, "out")
-            sleep(.05)
 
-            # Send "Increment Address" command.
-
-            send(0x06, 6)
-            sleep(.05)
+            increment_address(g)
 
         g.set_direction(ICSPDAT, "in")
         g.set_direction(ICSPCLK, "in")
