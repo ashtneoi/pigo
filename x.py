@@ -67,7 +67,7 @@ def recv(length):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     g = pigo.GpioManager()
     with g:
@@ -88,7 +88,7 @@ if __name__ == "__main__":
         sleep(.05)
 
         key_sequence = 0x4D434850  # "MCHP"
-        send(reverse_bits(key_sequence, 32), 32)
+        send(key_sequence, 32)
         send(0, 1)
         sleep(.05)
 
