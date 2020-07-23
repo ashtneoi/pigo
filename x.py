@@ -10,7 +10,9 @@ ICSPCLK = 86
 
 T_CLK_HALF = 1e-6
 T_DLY = 10e-6
-
+T_PINT = 10e-3
+T_ERAB = 10e-3
+T_ERAR = 10e-3
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +95,13 @@ def load_configuration(g, data):
     sleep(T_DLY)
 
 
+def load_data_for_program_memory(g, data):
+    send(g, 0x02, 6)
+    sleep(T_DLY)
+    send(g, data << 1, 16)
+    sleep(T_DLY)
+
+
 def read_data_from_program_memory(g):
     send(g, 0x04, 6)
     g.set_direction(ICSPDAT, "in")
@@ -114,9 +123,22 @@ def reset_address(g):
     sleep(T_DLY)
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+def begin_internally_timed_programming(g):
+    send(g, 0x08, 6)
+    sleep(T_PINT)
 
+
+def bulk_erase_program_memory(g):
+    send(g, 0x09, 6)
+    sleep(T_ERAB)
+
+
+def row_erase_program_memory(g):
+    send(g, 0x11, 6)
+    sleep(T_ERAR)
+
+
+def test_config_read_repeatability():
     g = pigo.GpioManager()
     with g:
         # Exit programming mode, if active.
@@ -147,6 +169,8 @@ if __name__ == "__main__":
 
             reset_address(g)
 
-        g.set_direction(ICSPDAT, "in")
-        g.set_direction(ICSPCLK, "in")
-        g.set_direction(MCLR_N, "in")
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
+    test_config_read_repeatability()
