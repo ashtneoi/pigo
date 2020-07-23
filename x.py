@@ -8,6 +8,9 @@ MCLR_N = 79
 ICSPDAT = 84
 ICSPCLK = 86
 
+T_CLK_HALF = 1e-6
+T_DLY = 10e-6
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +39,10 @@ def send(g, data, length):
         bit = data & 1
         g.set_value(ICSPDAT, bit)
         g.set_value(ICSPCLK, 1)
-        sleep(.001)
+        sleep(T_CLK_HALF)
+
         g.set_value(ICSPCLK, 0)
-        sleep(.001)
+        sleep(T_CLK_HALF)
 
         data >>= 1
 
@@ -56,12 +60,12 @@ def recv(g, length):
         data >>= 1
 
         g.set_value(ICSPCLK, 1)
-        sleep(.001)
+        sleep(T_CLK_HALF)
 
         bit = g.get_value(ICSPDAT)
         data |= bit << (length - 1)
         g.set_value(ICSPCLK, 0)
-        sleep(.001)
+        sleep(T_CLK_HALF)
 
     return data
 
@@ -74,42 +78,40 @@ def enter_lvp_mode(g):
 
     # Send LVP key sequence.
 
+    key_sequence = 0x4D434850  # "MCHP"
     g.set_value(ICSPCLK, 0)
     g.set_direction(ICSPDAT, "out")
-    sleep(.05)
-
-    key_sequence = 0x4D434850  # "MCHP"
     send(g, key_sequence, 32)
     send(g, 0, 1)
-    sleep(.05)
+    sleep(T_DLY)
 
 
 def load_configuration(g, data):
     send(g, 0x00, 6)
-    sleep(.001)
+    sleep(T_DLY)
     send(g, data << 1, 16)
-    sleep(.001)
+    sleep(T_DLY)
 
 
 def read_data_from_program_memory(g):
     send(g, 0x04, 6)
     g.set_direction(ICSPDAT, "in")
-    sleep(.001)
+    sleep(T_DLY)
     data = recv(g, 16)
     g.set_direction(ICSPDAT, "out")
-    sleep(.001)
+    sleep(T_DLY)
 
     return (data >> 1) & 0x3FFF
 
 
 def increment_address(g):
     send(g, 0x06, 6)
-    sleep(.001)
+    sleep(T_DLY)
 
 
 def reset_address(g):
     send(g, 0x16, 6)
-    sleep(.001)
+    sleep(T_DLY)
 
 
 if __name__ == "__main__":
@@ -119,7 +121,7 @@ if __name__ == "__main__":
     with g:
         # Exit programming mode, if active.
         g.set_value(MCLR_N, 1)
-        sleep(.5)
+        sleep(.05)
 
         enter_lvp_mode(g)
 
