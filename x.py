@@ -170,9 +170,7 @@ def test_config_read_repeatability():
             reset_address(g)
 
 
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-
+def test_write_program():
     g = pigo.GpioManager()
     with g:
         # Exit programming mode, if active.
@@ -240,3 +238,9 @@ if __name__ == "__main__":
         print(f"RB7 = {rb7}")
         rb6 = g.get_value(ICSPCLK)
         print(f"RB6 = {rb6}")
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+
+    test_config_read_repeatability()
