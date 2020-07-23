@@ -173,4 +173,70 @@ def test_config_read_repeatability():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    test_config_read_repeatability()
+    g = pigo.GpioManager()
+    with g:
+        # Exit programming mode, if active.
+        g.set_value(MCLR_N, 1)
+        sleep(.05)
+
+        enter_lvp_mode(g)
+
+        print("Erasing row")
+        reset_address(g)
+        row_erase_program_memory(g)
+
+        print("Reading row")
+        reset_address(g)
+        for addr in range(0x0020):
+            data = read_data_from_program_memory(g)
+            print(f"    [0x{addr:04X}]: 0x{data:04X}")
+            increment_address(g)
+
+        code = [
+            # RB7 = 1
+            # RB6 = 0
+
+            # [2 @ 0x0D] LATB
+            # LATB7 = 1
+            # LATB6 = 0
+            0x3080,  # movlw 0x80
+            0x0022,  # movlb 2
+            0x008D,  # movwf 0x0D
+
+            # [1 @ 0x0D] TRISB
+            # TRISB7 = 0
+            # TRISB6 = 0
+            0x303F,  # movlw 0x3F
+            0x0021,  # movlb 1
+            0x008D,  # movwf 0x0D
+
+            # Spin forever.
+            0x33FF,  # bra -1
+        ]
+
+        print("Programming row")
+        reset_address(g)
+        assert len(code) <= 32
+        for addr, word in enumerate(code):
+            load_data_for_program_memory(g, word)
+            if addr != len(code) - 1:
+                increment_address(g)
+        begin_internally_timed_programming(g)
+
+        print("Reading row")
+        reset_address(g)
+        for addr in range(0x0020):
+            data = read_data_from_program_memory(g)
+            print(f"    [0x{addr:04X}]: 0x{data:04X}")
+            increment_address(g)
+
+        g.set_direction(ICSPDAT, "in")
+        g.set_direction(ICSPCLK, "in")
+        sleep(.05)
+
+        g.set_value(MCLR_N, 1)
+
+        rb7 = g.get_value(ICSPDAT)
+        print(f"RB7 = {rb7}")
+        rb6 = g.get_value(ICSPCLK)
+        print(f"RB6 = {rb6}")
